@@ -61,6 +61,12 @@ void Error_Handler(void);
 #define USART2_TX_GPIO_Port GPIOA
 #define USART2_RX_Pin GPIO_PIN_3
 #define USART2_RX_GPIO_Port GPIOA
+#define STEPPER_PUL_Pin GPIO_PIN_4
+#define STEPPER_PUL_GPIO_Port GPIOA
+#define STEPPER_DIR_Pin GPIO_PIN_5
+#define STEPPER_DIR_GPIO_Port GPIOA
+#define STEPPER_ENA_Pin GPIO_PIN_6
+#define STEPPER_ENA_GPIO_Port GPIOA
 #define T_SWDIO_Pin GPIO_PIN_13
 #define T_SWDIO_GPIO_Port GPIOA
 #define T_SWCLK_Pin GPIO_PIN_14
