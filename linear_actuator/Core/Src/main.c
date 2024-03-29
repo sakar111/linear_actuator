@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define RX_COMMAND_BUFFER_SIZE 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,7 +45,7 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+uint8_t RxCommandData[RX_COMMAND_BUFFER_SIZE];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -51,11 +53,46 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-void controlStepperMotor(int32_t steps, uint32_t time);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void controlStepperMotor(int32_t steps, uint32_t time) {
+
+    // Ensure steps is not zero to avoid division by zero
+    if (steps == 0) {
+        // Handle error or return early
+        return;
+    }
+	// Calculate delay
+	uint32_t delay = (uint32_t)time/abs(steps);
+
+    // Enable stepper motor driver
+    HAL_GPIO_WritePin(STEPPER_ENA_GPIO_Port, STEPPER_ENA_Pin, GPIO_PIN_RESET);
+
+    // Set direction (for example, if steps > 0, rotate clockwise; else, rotate counterclockwise)
+    if (steps > 0) {
+        HAL_GPIO_WritePin(STEPPER_DIR_GPIO_Port, STEPPER_DIR_Pin, GPIO_PIN_SET); // Rotate clockwise
+    } else {
+        HAL_GPIO_WritePin(STEPPER_DIR_GPIO_Port, STEPPER_DIR_Pin, GPIO_PIN_RESET); // Rotate counterclockwise
+    }
+
+    // Pulse the step pin for each step
+    for (int i = 0; i < abs(steps); i++) {
+        HAL_GPIO_WritePin(STEPPER_PUL_GPIO_Port, STEPPER_PUL_Pin, GPIO_PIN_SET);
+        HAL_Delay(delay); // Adjust delay as needed for your stepper motor speed
+        HAL_GPIO_WritePin(STEPPER_PUL_GPIO_Port, STEPPER_PUL_Pin, GPIO_PIN_RESET);
+        //HAL_Delay(delay); // Adjust delay as needed for your stepper motor speed
+    }
+
+    // Disable stepper motor driver
+    HAL_GPIO_WritePin(STEPPER_ENA_GPIO_Port, STEPPER_ENA_Pin, GPIO_PIN_SET);
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	HAL_UARTEx_ReceiveToIdle_IT(&huart2, RxCommandData, RX_COMMAND_BUFFER_SIZE);
+}
 
 /* USER CODE END 0 */
 
@@ -94,18 +131,16 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  // Turn the Enable Pin Low to enable the driver
+  HAL_UARTEx_ReceiveToIdle_IT(&huart2, RxCommandData, RX_COMMAND_BUFFER_SIZE);
+  int stepper_steps = 0;
+  int stepper_time = 0;
   while (1)
   {
-	  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);	// Toggle the led pin
-	  HAL_Delay(1000);	// 1000ms delay
-
-	  // check rotating stepper
-	  controlStepperMotor(1000, 1000);
-	  HAL_Delay(1000);
-	  controlStepperMotor(-1000, 10000);
-
-
+	  sscanf((const char*)RxCommandData, "%d %d", &stepper_steps, &stepper_time);
+	  controlStepperMotor(stepper_steps, stepper_time);	// Control stepper motor
+      memset(RxCommandData, 0, RX_COMMAND_BUFFER_SIZE); // Clear buffer
+      HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);	// Toggle the led pin
+      HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -247,38 +282,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-/* USER CODE BEGIN 4 */
-void controlStepperMotor(int32_t steps, uint32_t time) {
-
-    // Ensure steps is not zero to avoid division by zero
-    if (steps == 0) {
-        // Handle error or return early
-        return;
-    }
-	// Calculate delay
-	uint32_t delay = (uint32_t)time/abs(steps);
-
-    // Enable stepper motor driver
-    HAL_GPIO_WritePin(STEPPER_ENA_GPIO_Port, STEPPER_ENA_Pin, GPIO_PIN_RESET);
-
-    // Set direction (for example, if steps > 0, rotate clockwise; else, rotate counterclockwise)
-    if (steps > 0) {
-        HAL_GPIO_WritePin(STEPPER_DIR_GPIO_Port, STEPPER_DIR_Pin, GPIO_PIN_SET); // Rotate clockwise
-    } else {
-        HAL_GPIO_WritePin(STEPPER_DIR_GPIO_Port, STEPPER_DIR_Pin, GPIO_PIN_RESET); // Rotate counterclockwise
-    }
-
-    // Pulse the step pin for each step
-    for (int i = 0; i < abs(steps); i++) {
-        HAL_GPIO_WritePin(STEPPER_PUL_GPIO_Port, STEPPER_PUL_Pin, GPIO_PIN_SET);
-        HAL_Delay(delay); // Adjust delay as needed for your stepper motor speed
-        HAL_GPIO_WritePin(STEPPER_PUL_GPIO_Port, STEPPER_PUL_Pin, GPIO_PIN_RESET);
-        HAL_Delay(delay); // Adjust delay as needed for your stepper motor speed
-    }
-
-    // Disable stepper motor driver
-    HAL_GPIO_WritePin(STEPPER_ENA_GPIO_Port, STEPPER_ENA_Pin, GPIO_PIN_SET);
-}
 /* USER CODE END 4 */
 
 /**
