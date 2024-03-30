@@ -46,6 +46,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 uint8_t RxCommandData[RX_COMMAND_BUFFER_SIZE];
+volatile int16_t stepper_encoder_count = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -141,6 +142,10 @@ int main(void)
       memset(RxCommandData, 0, RX_COMMAND_BUFFER_SIZE); // Clear buffer
       HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);	// Toggle the led pin
       HAL_Delay(500);
+      // Send current stepper_encoder_count through uart
+      char countStr[10];
+      sprintf(countStr, "%d\r\n", stepper_encoder_count);
+      HAL_UART_Transmit(&huart2, (uint8_t*)countStr, strlen(countStr), 100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -270,6 +275,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : STEPPER_ENCODER_A_INT_Pin */
+  GPIO_InitStruct.Pin = STEPPER_ENCODER_A_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(STEPPER_ENCODER_A_INT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : STEPPER_ENCODER_B_Pin */
+  GPIO_InitStruct.Pin = STEPPER_ENCODER_B_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(STEPPER_ENCODER_B_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -277,11 +294,27 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	uint8_t pinA = HAL_GPIO_ReadPin(STEPPER_ENCODER_A_INT_GPIO_Port, STEPPER_ENCODER_A_INT_Pin);
+	uint8_t pinB = HAL_GPIO_ReadPin(STEPPER_ENCODER_B_GPIO_Port, STEPPER_ENCODER_B_Pin);
+	uint8_t dir = pinA ^ pinB;
+	if (dir){
+		stepper_encoder_count--;
+	}
+	else{
+		stepper_encoder_count++;
+	}
+}
 /* USER CODE END 4 */
 
 /**
